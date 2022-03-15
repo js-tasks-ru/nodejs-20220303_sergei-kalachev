@@ -64,8 +64,6 @@ server.on('request', (req, res) => {
       })
       .pipe(writeStream)
       .on('error', (err) => {
-        console.log('write error');
-        console.log(err);
         switch (err.code) {
           case 'EEXIST':
             res.statusCode = 409;
@@ -76,11 +74,7 @@ server.on('request', (req, res) => {
             return;
         }
       })
-      .on('close', () => {
-        console.log('write close');
-      })
       .on('finish', () => {
-        console.log('write finish');
         res.statusCode = 201;
         res.end();
       });
