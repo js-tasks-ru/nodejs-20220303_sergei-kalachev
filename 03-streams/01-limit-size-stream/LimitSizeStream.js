@@ -16,7 +16,7 @@ class LimitSizeStream extends stream.Transform {
       callback(null, chunk);
       this.bytesPassed += chunkSize;
     } else {
-      callback(new LimitExceededError(), chunk);
+      callback(new LimitExceededError());
     }
   }
 }

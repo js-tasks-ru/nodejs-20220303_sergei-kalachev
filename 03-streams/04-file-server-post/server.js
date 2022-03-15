@@ -1,12 +1,16 @@
 const http = require('http');
 const path = require('path');
 const {createWriteStream, rm} = require('fs');
-const {pipeline} = require('stream');
 const LimitSizeStream = require('./LimitSizeStream');
 
 const ONE_MEGABYTE_IN_BYTES = 1048576;
 
 const server = new http.Server();
+
+const handleErrorDefault = (res) => {
+  res.statusCode = 500;
+  res.end('Server error');
+};
 
 server.on('request', (req, res) => {
   if (req.method !== 'POST') {
@@ -35,39 +39,51 @@ server.on('request', (req, res) => {
   const writeStream = createWriteStream(filepath, {flags: 'wx'});
   const limitSizeStream = new LimitSizeStream({limit: ONE_MEGABYTE_IN_BYTES});
 
-  pipeline(
-      req,
-      limitSizeStream,
-      writeStream,
-      (err) => {
-        if (err) {
-          switch (err.code) {
-            case 'LIMIT_EXCEEDED':
-              rm(filepath, {force: true}, () => {
-                res.statusCode = 413;
-                res.end('Limit exceeded');
-              });
-              return;
-            case 'EEXIST':
-              res.statusCode = 409;
-              res.end('File already exists');
-              return;
-            case 'ECONNRESET':
-              rm(filepath, {force: true}, () => {
-                res.end();
-              });
-              return;
-            default:
-              res.statusCode = 500;
-              res.end('Server error');
-              return;
-          }
-        }
+  req.on('aborted', () => {
+    writeStream.destroy();
+    rm(filepath, {force: true}, () => {
+      res.end();
+    });
+  });
 
+  req
+      .pipe(limitSizeStream)
+      .on('error', (err) => {
+        switch (err.code) {
+          case 'LIMIT_EXCEEDED':
+            writeStream.destroy();
+            rm(filepath, {force: true}, () => {
+              res.statusCode = 413;
+              res.end('Limit exceeded');
+            });
+            return;
+          default:
+            handleErrorDefault(res);
+            return;
+        }
+      })
+      .pipe(writeStream)
+      .on('error', (err) => {
+        console.log('write error');
+        console.log(err);
+        switch (err.code) {
+          case 'EEXIST':
+            res.statusCode = 409;
+            res.end('File already exists');
+            return;
+          default:
+            handleErrorDefault(res);
+            return;
+        }
+      })
+      .on('close', () => {
+        console.log('write close');
+      })
+      .on('finish', () => {
+        console.log('write finish');
         res.statusCode = 201;
         res.end();
-      },
-  );
+      });
 });
 
 module.exports = server;
