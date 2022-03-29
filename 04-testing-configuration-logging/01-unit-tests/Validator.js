@@ -6,15 +6,19 @@ module.exports = class Validator {
   validate(obj) {
     const errors = [];
 
-    for (const field of Object.keys(this.rules)) {
+    for (const field of Object.keys(obj)) {
       const rules = this.rules[field];
+
+      if (!rules) {
+        continue;
+      }
 
       const value = obj[field];
       const type = typeof value;
 
       if (type !== rules.type) {
         errors.push({field, error: `expect ${rules.type}, got ${type}`});
-        return errors;
+        continue;
       }
 
       switch (type) {
