@@ -8,10 +8,12 @@ module.exports.productsBySubcategory = async function productsBySubcategory(ctx,
   if (!subcategory) return next();
 
   if (!mongoose.isValidObjectId(subcategory)) {
-    throw new Error('Invalid subcategory id');
+    ctx.status = 400;
+    ctx.body = {error: 'Invalid object id'};
+    return;
   }
 
-  const products = await Product.find({'subcategories._id': subcategory});
+  const products = await Product.find({'subcategory': subcategory});
 
   ctx.body = {products: products.map(mapProduct)};
 };
@@ -26,12 +28,25 @@ module.exports.productList = async function productList(ctx, next) {
 
 module.exports.productById = async function productById(ctx, next) {
   if (!ctx.params.id) {
-    throw new Error('No product id provided');
+    ctx.status = 400;
+    ctx.body = {error: 'No product id provided'};
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(ctx.params.id)) {
+    ctx.status = 400;
+    ctx.body = {error: 'Invalid object id'};
+    return;
   }
 
   const product = await Product.findById(ctx.params.id);
 
-  ctx.body = {
-    product: product ? mapProduct(product) : null,
-  };
+  if (!product) {
+    ctx.status = 404;
+    ctx.body = {error: 'Product is not found'};
+  } else {
+    ctx.body = {
+      product: mapProduct(product),
+    };
+  }
 };
